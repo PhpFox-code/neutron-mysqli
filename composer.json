@@ -17,7 +17,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Phpfox\\Mysqli\\": "src/"
+      "Phpfox\\Mysqli\\": "test/"
     }
   },
   "require": {

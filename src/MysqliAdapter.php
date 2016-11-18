@@ -3,6 +3,9 @@
 namespace Phpfox\Mysqli;
 
 use Phpfox\Db\AdapterInterface;
+use Phpfox\Db\ConnectException;
+use Phpfox\Db\SqlAdapterTrait;
+use Phpfox\Db\SqlException;
 
 /**
  * Class MysqliAdapter
@@ -11,6 +14,7 @@ use Phpfox\Db\AdapterInterface;
  */
 class MysqliAdapter implements AdapterInterface
 {
+    use SqlAdapterTrait;
 
     /**
      * @var array
@@ -63,46 +67,6 @@ class MysqliAdapter implements AdapterInterface
         $this->params = (array)$params;
     }
 
-    /**
-     * @param string $table
-     * @param array  $data
-     *
-     * @return SqlInsert
-     * @throws SqlException
-     */
-    public function insert($table, $data)
-    {
-        return (new SqlInsert($this))->insert($table, $data);
-    }
-
-    /**
-     * @return SqlSelect
-     */
-    public function select()
-    {
-        return new SqlSelect($this);
-    }
-
-    /**
-     * @param  $table
-     * @param  $data
-     *
-     * @return SqlUpdate
-     */
-    public function update($table, $data)
-    {
-        return (new SqlUpdate($this))->update($table, $data);
-    }
-
-    /**
-     * @param string $table
-     *
-     * @return SqlDelete
-     */
-    public function delete($table)
-    {
-        return (new SqlDelete($this))->from($table);
-    }
 
     /**
      * @return bool
@@ -166,7 +130,7 @@ class MysqliAdapter implements AdapterInterface
             $params['socket']);
 
         if (null == $connection) {
-            throw new DbException('Could not connect database');
+            throw new ConnectException('Could not connect database');
         }
 
         if ($connection->connect_errno) {
@@ -174,7 +138,7 @@ class MysqliAdapter implements AdapterInterface
                 ':number' => $connection->connect_errno,
                 ':msg'    => $connection->connect_error,
             ]);
-            throw new DbException($msg);
+            throw new ConnectException($msg);
         }
 
         // set correct charset
@@ -262,43 +226,6 @@ class MysqliAdapter implements AdapterInterface
     }
 
     /**
-     * Describe table
-     *
-     * @param  string $table
-     *
-     * @return array
-     */
-    public function describe($table)
-    {
-
-        $result = $this->getMaster()->query('describe ' . $table);
-
-        $primary = [];
-        $column = [];
-        $identity = '';
-
-        while (null != ($row = mysqli_fetch_assoc($result))) {
-            $column[$row['Field']] = 1;
-
-            if (strtolower($row['Key']) == 'pri') {
-                $primary[$row['Field']] = 1;
-            }
-
-            if (strtolower($row['Extra']) == 'auto_increment') {
-                $identity = $row['Field'];
-            }
-        }
-
-        return [
-            'column'   => $column,
-            'identity' => $identity,
-            'primary'  => $primary,
-            'name'     => $table,
-        ];
-    }
-
-
-    /**
      * @return int
      */
     public function lastId()
@@ -311,17 +238,6 @@ class MysqliAdapter implements AdapterInterface
         return 0;
     }
 
-    /**
-     * @param string $table
-     * @param array  $data
-     *
-     * @return SqlInsert
-     * @throws SqlException
-     */
-    public function insertDelay($table, $data)
-    {
-        return (new SqlInsert($this))->insert($table, $data)->setDelay(true);
-    }
 
     /**
      * @return array [string, ]
@@ -364,7 +280,7 @@ class MysqliAdapter implements AdapterInterface
         return $this->getMaster()->query($sql);
     }
 
-    public function startTransaction()
+    public function begin()
     {
         if ($this->_inTransaction) {
             return;
@@ -376,9 +292,6 @@ class MysqliAdapter implements AdapterInterface
         $this->_inTransaction = true;
     }
 
-    /**
-     * Commit transaction
-     */
     public function commit()
     {
         if (!$this->_inTransaction) {
@@ -387,6 +300,7 @@ class MysqliAdapter implements AdapterInterface
 
         $this->exec('COMMIT');
         $this->_inTransaction = false;
+        return $this;
     }
 
     public function rollback()

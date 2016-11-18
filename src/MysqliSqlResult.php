@@ -11,10 +11,6 @@ use Phpfox\Db\SqlResultInterface;
  */
 class MysqliSqlResult implements SqlResultInterface
 {
-    /**
-     * @var bool
-     */
-    private $valid = false;
 
     /**
      * @var \mysqli_result
@@ -22,30 +18,13 @@ class MysqliSqlResult implements SqlResultInterface
     private $resource;
 
     /**
-     * @var string
-     */
-    private $error;
-
-    /**
      * SqlResult constructor.
      *
-     * @param $valid
      * @param $resource
-     * @param $error
      */
-    public function __construct($valid, $resource, $error)
+    public function __construct($resource)
     {
-        $this->valid = $valid;
         $this->resource = $resource;
-        $this->error = $error;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function isValid()
-    {
-        return $this->valid;
     }
 
     /**
