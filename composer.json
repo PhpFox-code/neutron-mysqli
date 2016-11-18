@@ -1,0 +1,26 @@
+{
+  "name": "codelego/phpfox-mysqli",
+  "description": "Mysqli database driver support for phpfox framework.",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Nam Nguyen",
+      "email": "nam.ngvan@gmail.com"
+    }
+  ],
+  "minimum-stability": "dev",
+  "autoload": {
+    "psr-4": {
+      "Phpfox\\Mysqli\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Phpfox\\Mysqli\\": "src/"
+    }
+  },
+  "require": {
+    "codelego/phpfox-db": "dev-master"
+  }
+}
