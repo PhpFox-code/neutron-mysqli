@@ -35,13 +35,9 @@ class MysqliAdapterTest extends \PHPUnit_Framework_TestCase
 
     public function getAdapter()
     {
-        return new MysqliAdapter([
-            'host'     => '127.0.0.1',
-            'port'     => 3306,
-            'user'     => 'root',
-            'password' => 'namnv123',
-            'database' => 'phpfox_unitest',
-        ]);
+        $configs = include __DIR__ . '/../../../../config/db.config.php';
+
+        return new MysqliAdapter($configs);
     }
 
     public function testSqlSelect()
@@ -52,7 +48,7 @@ class MysqliAdapterTest extends \PHPUnit_Framework_TestCase
 
         $sqlResult = $sqlSelect->select('*')->select('user_id')
             ->from('phpfox_user')->where('user_id=1')->execute();
-        
+
         $this->assertTrue($sqlResult->isValid());
 
         $sqlResult->fetch();
@@ -64,11 +60,10 @@ class MysqliAdapterTest extends \PHPUnit_Framework_TestCase
 
         $sqlUpdate = new SqlUpdate($adapter);
 
-        $sqlUpdate->update('phpfox_user')->values(['username' => 'namnv'])
-            ->where(['user_id=?' => 1])->execute();
+        $result = $sqlUpdate->update('phpfox_user')
+            ->values(['user_name' => 'namnv'])->where(['user_id=?' => 1])
+            ->execute(); // do not forget execute for that trim.
 
-        echo $sqlUpdate->prepare();
-
-
+        $this->assertTrue($result->isValid(), 'Can not update user');
     }
 }
