@@ -17,35 +17,19 @@ class MysqliAdapter implements AdapterInterface
     use SqlAdapterTrait;
 
     /**
-     * @var array
-     */
-    protected $checkKeys
-        = [
-            'host',
-            'port',
-            'socket',
-            'user',
-            'password',
-            'charset',
-            'persistent',
-            'database',
-            'prefix',
-        ];
-
-    /**
-     * @var \mysqli|resource
+     * @var \mysqli|null
      */
     protected $master;
 
     /**
-     * @var \mysqli|resource
+     * @var \mysqli|null
      */
     protected $slave;
 
     /**
-     * @var bool
+     * @var \mysqli|null
      */
-    protected $replication = false;
+    protected $lastUsage;
 
     /**
      * @var array
@@ -58,15 +42,29 @@ class MysqliAdapter implements AdapterInterface
     protected $_inTransaction = false;
 
     /**
-     * @param bool  $replicate
-     * @param array $params
+     * MysqliAdapter constructor.
+     *
+     * @param $params
+     *
      */
-    public function __construct($replicate, $params)
+    public function __construct($params)
     {
-        $this->replication = $replicate && count($params['slave']) > 0;
-        $this->params = (array)$params;
-    }
+        $this->params = array_merge([
+            'host'     => 'localhost',
+            'port'     => 3306,
+            'database' => null,
+            'user'     => null,
+            'password' => null,
+            'socket'   => null,
+            'charset'  => 'utf8mb4',
+            'masters'  => [],
+            'slaves'   => [],
+        ], $params);
 
+        if (empty($this->params['masters'])) {
+            $this->params['masters'] = [$this->params['host']];
+        }
+    }
 
     /**
      * @return bool
@@ -76,21 +74,34 @@ class MysqliAdapter implements AdapterInterface
         return $this->_inTransaction;
     }
 
-    public function query($sql, $master = true)
+    public function reconnect()
     {
-        $connection = $master ? $this->getMaster() : $this->getSlave();
+        $this->disconnect();
+        $this->connect();
+    }
 
-        $result = $connection->query($sql);
-
-        if (false === $result) {
-            throw new SqlException($this->getErrorMessage() . PHP_EOL . $sql);
+    public function disconnect()
+    {
+        if ($this->master instanceof \mysqli) {
+            $this->master->close();
+            $this->master = null;
         }
 
-        if (null === $result) {
-            throw new SqlException($this->getErrorMessage() . PHP_EOL . $sql);
+        if ($this->slave instanceof \mysqli) {
+            $this->slave->close();
+            $this->slave = null;
         }
 
-        return new MysqliSqlResult($result);
+        $this->master = null;
+        $this->slave = null;
+        $this->lastUsage = null;
+        $this->_inTransaction = null;
+    }
+
+    public function connect()
+    {
+        $this->getMaster();
+        $this->getSlave();
     }
 
     /**
@@ -99,52 +110,52 @@ class MysqliAdapter implements AdapterInterface
     public function getMaster()
     {
         if (!$this->master) {
-
-            // cascauding global configuration
-            $defs = [];
-            foreach ($this->checkKeys as $key) {
-                if (isset($this->params[$key])) {
-                    $defs[$key] = $this->params[$key];
-                }
-            }
-            $this->master = $this->connect(array_merge($defs,
-                $this->params['master']));
+            $this->master = $this->_connect(true);
         }
-
         return $this->master;
     }
 
-    public function connect($params)
+    public function _connect($flag)
     {
-        $params = array_merge([
-            'host'     => 'localhost',
-            'port'     => 3306,
-            'database' => null,
-            'user'     => null,
-            'password' => null,
-            'socket'   => null,
-        ], $params);
+        $params = $this->params;
+        $mysqli = new \mysqli();
+        $mysqli->init();
 
-        $connection = new \mysqli($params['host'], $params['user'],
-            $params['password'], $params['database'], $params['port'],
-            $params['socket']);
-
-        if (null == $connection) {
-            throw new ConnectException('Could not connect database');
+        $hosts = $params['masters'];
+        $port = (int)$params['port'];
+        $socket = $params['socket'];
+        if (!$port) {
+            $port = 3306;
         }
 
-        if ($connection->connect_errno) {
-            $msg = strtr('Db connection error #:number: :msg', [
-                ':number' => $connection->connect_errno,
-                ':msg'    => $connection->connect_error,
-            ]);
-            throw new ConnectException($msg);
+
+        if (!$flag) {
+            $hosts = $params['slaves'];
         }
 
-        // set correct charset
-        $connection->set_charset('utf8mb4');
+        if (!$flag and empty($hosts)) {
+            return $this->getMaster();
+        }
 
-        return $connection;
+        if (empty($hosts)) {
+            throw new ConnectException('There are no host available');
+        }
+
+        $hosts = array_values($hosts);
+        $offset = mt_rand(0, count($hosts) - 1);
+        $host = $hosts[$offset];
+
+        $result = $mysqli->real_connect($host, $params['user'],
+            $params['password'], $params['database'], $port);
+
+        if (!$result) {
+            throw new ConnectException('Could not connect database '
+                . $mysqli->error);
+        }
+
+        $mysqli->set_charset($params['charset']);
+
+        return $mysqli;
     }
 
     /**
@@ -152,44 +163,15 @@ class MysqliAdapter implements AdapterInterface
      */
     public function getSlave()
     {
-        if (null != $this->slave) {
-            return $this->slave;
-        }
-
-        if (false == $this->replication) {
-            $this->slave = $this->getMaster();
-        }
-
         if (!$this->slave) {
-            $defs = [];
-            foreach ($this->checkKeys as $key) {
-                if (isset($this->params[$key])) {
-                    $defs[$key] = $this->params[$key];
-                }
-            }
-
-            $array = $this->params['slave'];
-            $length = count($array);
-            $params = $length == 1 ? array_shift($array)
-                : $array[mt_rand(0, $length - 1)];
-            $this->slave = $this->connect(array_merge($defs, $params));
+            $this->slave = $this->_connect(false);
         }
-
-        if (!$this->slave) {
-            $this->slave = $this->master;
-        }
-
         return $this->slave;
-    }
-
-    public function getErrorMessage($master = true)
-    {
-        return $this->getMaster()->error;
     }
 
     public function quoteIdentifier($value)
     {
-        return $value;
+        return '`' . $value . '`';
     }
 
     /**
@@ -233,12 +215,6 @@ class MysqliAdapter implements AdapterInterface
         return $this->getMaster()->insert_id;
     }
 
-    public function getErrorCode($master = true)
-    {
-        return 0;
-    }
-
-
     /**
      * @return array [string, ]
      */
@@ -255,41 +231,37 @@ class MysqliAdapter implements AdapterInterface
         return $response;
     }
 
-    /**
-     * @param $table
-     *
-     * @return string
-     */
-    public function getCreateTableSql($table)
-    {
-        $result = $this->exec("SHOW CREATE TABLE `" . $table . "`");
-
-        $row = mysqli_fetch_array($result, MYSQLI_BOTH);
-
-        return $row[1];
-    }
-
-    /**
-     * @param string    $sql
-     * @param bool|true $master
-     *
-     * @return bool|\mysqli_result
-     */
-    public function exec($sql, $master = true)
-    {
-        return $this->getMaster()->query($sql);
-    }
-
     public function begin()
     {
         if ($this->_inTransaction) {
-            return;
+            return $this;
         }
 
-        $this->exec('START TRANSACTION');
+        $this->execute('START TRANSACTION', true);
 
-        // set in transaction
         $this->_inTransaction = true;
+        return $this;
+    }
+
+    public function execute($sql, $master = true)
+    {
+        $this->lastUsage = $master ? $this->getMaster() : $this->getSlave();
+
+        $result = $this->lastUsage->query($sql);
+
+        if (false === $result || null === $result) {
+            throw new SqlException($this->error() . PHP_EOL . $sql);
+        }
+
+        return new MysqliSqlResult($result);
+    }
+
+    public function error($master = true)
+    {
+        if ($this->lastUsage instanceof \mysqli) {
+            return $this->lastUsage->error;
+        }
+        return '';
     }
 
     public function commit()
@@ -298,14 +270,17 @@ class MysqliAdapter implements AdapterInterface
             return false;
         }
 
-        $this->exec('COMMIT');
+        $this->execute('COMMIT', true);
         $this->_inTransaction = false;
+
         return $this;
     }
 
     public function rollback()
     {
-        $this->exec('ROLLBACK');
+        $this->execute('ROLLBACK', true);
         $this->_inTransaction = false;
+
+        return $this;
     }
 }

@@ -13,36 +13,29 @@ class MysqliSqlResult implements SqlResultInterface
 {
 
     /**
-     * @var \mysqli_result
+     * @var mixed
      */
     private $resource;
 
-    /**
-     * SqlResult constructor.
-     *
-     * @param $resource
-     */
     public function __construct($resource)
     {
         $this->resource = $resource;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function fetch($model = null)
+    public function isValid()
+    {
+        return $this->resource !== false;
+    }
+
+
+    public function fetch()
     {
         $result = [];
 
-        if (FETCH_OBJECT == $model || $model == null) {
-            while ($object = $this->resource->fetch_object()) {
-                $result[] = $object;
-            }
-        } elseif ($model == FETCH_ARRAY) {
-            while ($object = $this->resource->fetch_assoc()) {
-                $result[] = $object;
-            }
+        while (null != ($object = $this->resource->fetch_object())) {
+            $result[] = $object;
         }
+
         return $result;
     }
 }
