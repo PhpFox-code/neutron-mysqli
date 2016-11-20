@@ -35,9 +35,7 @@ class MysqliAdapterTest extends \PHPUnit_Framework_TestCase
 
     public function getAdapter()
     {
-        $configs = include __DIR__ . '/../../../../config/db.config.php';
-
-        return new MysqliAdapter($configs);
+        return service('db');
     }
 
     public function testSqlSelect()
@@ -69,19 +67,29 @@ class MysqliAdapterTest extends \PHPUnit_Framework_TestCase
 
     public function testPackages()
     {
-        $result = $this->getAdapter()->select()->from('pf5_core_package')
-            ->select('*')->where('is_active=?', 1)->order('is_core', 1)
-            ->order('priority', 1)->execute();
+        $result = service('db')
+            ->sqlSelect()
+            ->from(':core_package')
+            ->select('*')
+            ->where('is_active=?', 1)
+            ->order('is_core', 1)
+            ->order('priority', 1)
+            ->execute();
 
         $result = $result->fetch();
         $data = [];
         foreach ($result as $row) {
-            $data[$row->feature] = [
-                'path'      => $row->path,
-                'namespace' => $row->namespace,
-            ];
+            $configFilename = PHPFOX_DIR . '/' . $row->path
+                . '/config/module.config.php';
+            $data = array_merge_recursive($data, include $configFilename);
         }
 
-        var_export($data);
+        $autoloader = service('autoloader');
+        foreach ($data['psr4'] as $k => $vs) {
+            foreach ($vs as $v) {
+                $autoloader->addPsr4($k, PHPFOX_DIR . DS . $v);
+            }
+        }
+        service('log')->info(var_export($data, true));
     }
 }
