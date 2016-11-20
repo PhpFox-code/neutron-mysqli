@@ -66,4 +66,22 @@ class MysqliAdapterTest extends \PHPUnit_Framework_TestCase
 
         $this->assertTrue($result->isValid(), 'Can not update user');
     }
+
+    public function testPackages()
+    {
+        $result = $this->getAdapter()->select()->from('pf5_core_package')
+            ->select('*')->where('is_active=?', 1)->order('is_core', 1)
+            ->order('priority', 1)->execute();
+
+        $result = $result->fetch();
+        $data = [];
+        foreach ($result as $row) {
+            $data[$row->feature] = [
+                'path'      => $row->path,
+                'namespace' => $row->namespace,
+            ];
+        }
+
+        var_export($data);
+    }
 }
