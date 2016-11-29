@@ -1,5 +1,5 @@
 {
-  "name": "codelego/phpfox-mysqli",
+  "name": "codelego/neutron-mysqli",
   "description": "Mysqli database driver support for phpfox framework.",
   "type": "library",
   "license": "MIT",
@@ -21,6 +21,6 @@
     }
   },
   "require": {
-    "codelego/phpfox-db": "dev-master"
+    "codelego/neutron-db": "dev-master"
   }
 }
