@@ -1,10 +1,10 @@
 <?php
 
-namespace Phpfox\Mysqli;
+namespace Neutron\Mysqli;
 
 
-use Phpfox\Db\SqlSelect;
-use Phpfox\Db\SqlUpdate;
+use Neutron\Db\SqlSelect;
+use Neutron\Db\SqlUpdate;
 
 class MysqliAdapterTest extends \PHPUnit_Framework_TestCase
 {

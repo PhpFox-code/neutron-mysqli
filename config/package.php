@@ -1,6 +1,6 @@
 <?php
 
-namespace Phpfox\Mysqli;
+namespace Neutron\Mysqli;
 
 return [
     'db.drivers' => [

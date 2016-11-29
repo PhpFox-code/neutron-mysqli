@@ -1,16 +1,16 @@
 <?php
 
-namespace Phpfox\Mysqli;
+namespace Neutron\Mysqli;
 
-use Phpfox\Db\AdapterInterface;
-use Phpfox\Db\ConnectException;
-use Phpfox\Db\SqlAdapterTrait;
-use Phpfox\Db\SqlException;
+use Neutron\Db\AdapterInterface;
+use Neutron\Db\ConnectException;
+use Neutron\Db\SqlAdapterTrait;
+use Neutron\Db\SqlException;
 
 /**
  * Class MysqliAdapter
  *
- * @package Phpfox\Db
+ * @package Neutron\Db
  */
 class MysqliAdapter implements AdapterInterface
 {
